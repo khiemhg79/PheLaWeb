@@ -1,0 +1,144 @@
+services:
+  # Backend API Service
+  - type: web
+    name: phela-backend
+    runtime: docker
+    dockerfilePath: ./be_phela/Dockerfile
+    dockerContext: ./be_phela
+    plan: free
+    branch: main
+    envVars:
+      # Database Configuration (Supabase)
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "6543"
+      - key: DB_NAME
+        value: postgres
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      
+      # Port Configuration
+      - key: PORT
+        value: "10000"
+      
+      # Security & JWT
+      - key: JWT_SIGNER_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      
+      # URLs
+      - key: APP_BASE_URL
+        value: https://phela-backend.onrender.com
+      - key: FRONTEND_CUSTOMER_URL
+        value: https://phela-customer-tgza.onrender.com
+      - key: VITE_API_URL
+        value: "https://phela-backend-t84c.onrender.com"
+      - key: CORS_ALLOWED_ORIGINS
+        value: "https://phela-customer-tgza.onrender.com, https://phela-admin.onrender.com, http://localhost:3000, http://localhost:3001"
+      
+      # Email Configuration (Gmail/SendGrid)
+      - key: MAIL_HOST
+        value: smtp.gmail.com
+      - key: MAIL_PORT
+        value: "587"
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      
+      # Cloudinary Configuration
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      
+      # PayOS Configuration
+      - key: PAYOS_CLIENT_ID
+        sync: false
+      - key: PAYOS_API_KEY
+        sync: false
+      - key: PAYOS_CHECKSUM_KEY
+        sync: false
+      - key: PAYOS_RETURN_URL
+        value: https://phela-customer-tgza.onrender.com/order-success
+      - key: PAYOS_CANCEL_URL
+        value: https://phela-customer-tgza.onrender.com/order-failed
+
+      # SePay Configuration
+      - key: SEPAY_API_KEY
+        sync: false
+      - key: BANK_ID
+        value: mbb
+      - key: BANK_ACCOUNT_NO
+        sync: false
+      - key: BANK_ACCOUNT_NAME
+        sync: false
+      
+      # Google OAuth2
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      
+      # AI & Gemini
+      - key: GEMINI_API_KEY
+        sync: false
+
+      # Optimization & Production Config
+      - key: HIBERNATE_DDL_AUTO
+        value: "none"
+      - key: SPRING_PROFILES_ACTIVE
+        value: "prod"
+
+  # Frontend Customer Service
+  - type: web
+    name: phela-customer
+    runtime: node
+    rootDir: ./fe_phela
+    plan: free
+    branch: main
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: node server.mjs
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: VITE_API_URL
+        value: https://phela-backend-t84c.onrender.com
+      - key: VITE_ROLE
+        value: customer
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
+      - key: NODE_ENV
+        value: production
+
+  # Frontend Admin Service
+  - type: web
+    name: phela-admin
+    runtime: node
+    rootDir: ./fe_phela
+    plan: free
+    branch: main
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: node server.mjs
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: VITE_API_URL
+        value: https://phela-backend-t84c.onrender.com
+      - key: VITE_ROLE
+        value: admin
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
+      - key: NODE_ENV
+        value: production
+

@@ -1,0 +1,121 @@
+package com.example.be_phela.repository;
+
+import com.example.be_phela.model.Order;
+import com.example.be_phela.model.enums.OrderStatus;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import com.example.be_phela.model.enums.PaymentMethod;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface OrderRepository extends JpaRepository<Order, String> {
+
+    @Query("SELECT o FROM orders o WHERE " +
+           "(:hasStatus = false OR o.status = :status) AND " +
+           "(:hasBranch = false OR o.branch.branchCode = :branchCode) AND " +
+           "(:hasPaymentMethod = false OR o.paymentMethod = :paymentMethod) AND " +
+           "(:hasStartDate = false OR o.orderDate >= :startDate) AND " +
+           "(:hasEndDate = false OR o.orderDate <= :endDate) AND " +
+           "(:hasQuery = false OR LOWER(o.orderCode) LIKE LOWER(CONCAT('%', :query, '%')) OR o.phone LIKE CONCAT('%', :query, '%') OR o.customer.phone LIKE CONCAT('%', :query, '%'))")
+    Page<Order> searchAndFilterOrders(
+            @Param("hasStatus") boolean hasStatus,
+            @Param("status") OrderStatus status,
+            @Param("hasBranch") boolean hasBranch,
+            @Param("branchCode") String branchCode,
+            @Param("hasPaymentMethod") boolean hasPaymentMethod,
+            @Param("paymentMethod") PaymentMethod paymentMethod,
+            @Param("hasStartDate") boolean hasStartDate,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("hasEndDate") boolean hasEndDate,
+            @Param("endDate") LocalDateTime endDate,
+            @Param("hasQuery") boolean hasQuery,
+            @Param("query") String query,
+            Pageable pageable
+    );
+
+    @Query("SELECT o FROM orders o WHERE " +
+           "(:hasStatus = false OR o.status = :status) AND " +
+           "(:hasBranch = false OR o.branch.branchCode = :branchCode) AND " +
+           "(:hasPaymentMethod = false OR o.paymentMethod = :paymentMethod) AND " +
+           "(:hasStartDate = false OR o.orderDate >= :startDate) AND " +
+           "(:hasEndDate = false OR o.orderDate <= :endDate) AND " +
+           "(:hasQuery = false OR LOWER(o.orderCode) LIKE LOWER(CONCAT('%', :query, '%')) OR o.phone LIKE CONCAT('%', :query, '%') OR o.customer.phone LIKE CONCAT('%', :query, '%'))")
+    List<Order> searchAndFilterOrdersList(
+            @Param("hasStatus") boolean hasStatus,
+            @Param("status") OrderStatus status,
+            @Param("hasBranch") boolean hasBranch,
+            @Param("branchCode") String branchCode,
+            @Param("hasPaymentMethod") boolean hasPaymentMethod,
+            @Param("paymentMethod") PaymentMethod paymentMethod,
+            @Param("hasStartDate") boolean hasStartDate,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("hasEndDate") boolean hasEndDate,
+            @Param("endDate") LocalDateTime endDate,
+            @Param("hasQuery") boolean hasQuery,
+            @Param("query") String query
+    );
+
+    List<Order> findByCustomer_CustomerIdOrderByOrderDateDesc(String customerId);
+    
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT o FROM orders o WHERE o.orderCode = :orderCode")
+    Optional<Order> findByOrderCodeWithLock(@Param("orderCode") String orderCode);
+    
+    Optional<Order> findByOrderCode(String orderCode);
+    boolean existsByOrderCode(String orderCode);
+    List<Order> findByOrderCodeContainingIgnoreCase(String orderCode);
+
+    // Tìm các đơn hàng theo một trạng thái cụ thể
+    @Query("SELECT o FROM orders o WHERE o.status = :status")
+    Page<Order> findByStatus(@Param("status") OrderStatus status, Pageable pageable);
+
+    @Query("SELECT o FROM orders o WHERE o.customer.customerId = :customerId")
+    Page<Order> findOrdersByCustomerId(@Param("customerId") String customerId, Pageable pageable);
+
+    // Đếm tổng số đơn hàng của một khách hàng theo trạng thái
+    long countByCustomer_CustomerIdAndStatus(String customerId, OrderStatus status);
+
+    // Thống kê số lượng đơn hàng theo từng trạng thái
+    @Query("SELECT o.status, COUNT(o) FROM orders o GROUP BY o.status")
+    List<Object[]> countOrdersByStatus();
+
+    // Thống kê doanh thu và số lượng đơn hàng trong một khoảng thời gian
+    @Query("SELECT FUNCTION('DATE', o.orderDate) AS order_date, SUM(o.finalAmount) AS daily_revenue, COUNT(o) AS order_count " +
+            "FROM orders o WHERE o.orderDate BETWEEN :startDate AND :endDate AND o.status = :status " +
+            "GROUP BY FUNCTION('DATE', o.orderDate) ORDER BY FUNCTION('DATE', o.orderDate)")
+    List<Object[]> findRevenueAndOrderCountByDateRange(
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate,
+            @Param("status") OrderStatus status
+    );
+
+    // Đếm tổng số đơn và số đơn đã hủy trong khoảng thời gian
+    @Query("SELECT COUNT(o), SUM(CASE WHEN o.status = 'CANCELLED' THEN 1 ELSE 0 END) FROM orders o WHERE o.orderDate BETWEEN :startDate AND :endDate")
+    List<Object[]> countTotalAndCancelledOrdersByDateRange(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+
+    @Query("SELECT COUNT(o) FROM orders o WHERE o.customer.customerId = :customerId AND o.status = :status AND o.updatedAt >= :since")
+    long countByCustomerAndStatusSince(
+            @Param("customerId") String customerId,
+            @Param("status") OrderStatus status,
+            @Param("since") LocalDateTime since
+    );
+
+    // Thống kê doanh thu theo chi nhánh trong một khoảng thời gian
+    @Query("SELECT b.branchCode, b.branchName, SUM(o.finalAmount), COUNT(o) " +
+            "FROM orders o LEFT JOIN o.branch b " +
+            "WHERE o.status = :status AND o.orderDate BETWEEN :startDate AND :endDate " +
+            "GROUP BY b.branchCode, b.branchName")
+    List<Object[]> findRevenueByBranchInDateRange(
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate,
+            @Param("status") OrderStatus status);
+}
